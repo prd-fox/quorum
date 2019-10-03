@@ -51,16 +51,15 @@ func (g *Constellation) Receive(data []byte) ([]byte, error) {
 	if len(data) == 0 {
 		return data, nil
 	}
-	// Ignore this error since not being a recipient of
-	// a payload isn't an error.
-	// TODO: Return an error if it's anything OTHER than
-	// 'you are not a recipient.'
 	dataStr := string(data)
 	x, found := g.c.Get(dataStr)
 	if found {
 		return x.([]byte), nil
 	}
-	pl, _ := g.node.ReceivePayload(data)
+	pl, err := g.node.ReceivePayload(data)
+	if err != nil {
+		return nil, err
+	}
 	g.c.Set(dataStr, pl, cache.DefaultExpiration)
 	return pl, nil
 }
@@ -89,8 +88,8 @@ func New(path string) (*Constellation, error) {
 		return nil, err
 	}
 	return &Constellation{
-		node: n,
-		c:    cache.New(5*time.Minute, 5*time.Minute),
+		node:                    n,
+		c:                       cache.New(5*time.Minute, 5*time.Minute),
 		isConstellationNotInUse: false,
 	}, nil
 }
@@ -98,8 +97,8 @@ func New(path string) (*Constellation, error) {
 func MustNew(path string) *Constellation {
 	if strings.EqualFold(path, "ignore") {
 		return &Constellation{
-			node: nil,
-			c:    nil,
+			node:                    nil,
+			c:                       nil,
 			isConstellationNotInUse: true,
 		}
 	}
