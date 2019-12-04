@@ -2,6 +2,7 @@ package raft
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
 
@@ -26,6 +27,27 @@ type Address struct {
 
 	// Ignore additional fields (for forward compatibility).
 	Rest []rlp.RawValue `json:"-" rlp:"tail"`
+}
+
+func (addr Address) MarshalJSON() ([]byte, error) {
+	type address struct {
+		RaftId   uint16        `json:"raftId"`
+		NodeId   enode.EnodeID `json:"nodeId"`
+		Ip       net.IP        `json:"ip,omitempty"`
+		P2pPort  enr.TCP       `json:"p2pPort"`
+		RaftPort enr.RaftPort  `json:"raftPort"`
+		Hostname string        `json:"hostname"`
+	}
+	var enc address
+	enc.RaftId = addr.RaftId
+	enc.NodeId = addr.NodeId
+	enc.P2pPort = addr.P2pPort
+	enc.RaftPort = addr.RaftPort
+	enc.Hostname = addr.Hostname
+	if ip := net.ParseIP(addr.Hostname); ip != nil && ip.To4() != nil {
+		enc.Ip = ip.To4()
+	}
+	return json.Marshal(&enc)
 }
 
 func newAddress(raftId uint16, raftPort int, node *enode.Node, withHostname bool) *Address {
