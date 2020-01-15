@@ -161,6 +161,7 @@ var AppHelpFlagGroups = []flagGroup{
 			utils.RaftBlockTimeFlag,
 			utils.RaftJoinExistingFlag,
 			utils.RaftPortFlag,
+			utils.RaftDNSEnabledFlag,
 		},
 	},
 	{
@@ -270,8 +271,7 @@ var AppHelpFlagGroups = []flagGroup{
 			utils.MinerLegacyEtherbaseFlag,
 			utils.MinerLegacyExtraDataFlag,
 		},
-	},
-	{
+	}, {
 		Name: "ISTANBUL",
 		Flags: []cli.Flag{
 			utils.IstanbulRequestTimeoutFlag,
