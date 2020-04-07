@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/log"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -146,6 +147,7 @@ func (c *Client) ReceivePayload(key []byte) ([]byte, error) {
 		return nil, err
 	}
 	if res.StatusCode != 200 {
+		log.Info("PETER", "status", res.StatusCode)
 		return nil, fmt.Errorf("Non-200 status code: %+v", res)
 	}
 
