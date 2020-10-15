@@ -6,12 +6,12 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/private/engine"
-	testifyassert "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestVersionApi_404NotFound(t *testing.T) {
-	assert := testifyassert.New(t)
+var testServer *httptest.Server
 
+func TestVersionApi_404NotFound(t *testing.T) {
 	mux := http.NewServeMux()
 
 	testServer = httptest.NewServer(mux)
@@ -22,12 +22,10 @@ func TestVersionApi_404NotFound(t *testing.T) {
 		BaseURL:    testServer.URL,
 	})
 
-	assert.Equal(apiVersion1, version)
+	assert.Equal(t, apiVersion1, version)
 }
 
 func TestVersionApi_GarbageData(t *testing.T) {
-	assert := testifyassert.New(t)
-
 	mux := http.NewServeMux()
 	mux.HandleFunc("/version/api", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("GARBAGE"))
@@ -41,12 +39,10 @@ func TestVersionApi_GarbageData(t *testing.T) {
 		BaseURL:    testServer.URL,
 	})
 
-	assert.Equal(apiVersion1, version)
+	assert.Equal(t, apiVersion1, version)
 }
 
 func TestVersionApi_emptyVersionsArray(t *testing.T) {
-	assert := testifyassert.New(t)
-
 	mux := http.NewServeMux()
 	mux.HandleFunc("/version/api", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("[]"))
@@ -60,12 +56,10 @@ func TestVersionApi_emptyVersionsArray(t *testing.T) {
 		BaseURL:    testServer.URL,
 	})
 
-	assert.Equal(apiVersion1, version)
+	assert.Equal(t, apiVersion1, version)
 }
 
 func TestVersionApi_invalidVersionItem(t *testing.T) {
-	assert := testifyassert.New(t)
-
 	mux := http.NewServeMux()
 	mux.HandleFunc("/version/api", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("{\"versions\":[{\"version\":\"1.0\"},{}]}"))
@@ -79,12 +73,10 @@ func TestVersionApi_invalidVersionItem(t *testing.T) {
 		BaseURL:    testServer.URL,
 	})
 
-	assert.Equal(apiVersion1, version)
+	assert.Equal(t, apiVersion1, version)
 }
 
 func TestVersionApi_validVersionInWrongOrder(t *testing.T) {
-	assert := testifyassert.New(t)
-
 	mux := http.NewServeMux()
 	mux.HandleFunc("/version/api", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("[\"2.0\",\"1.0\"]"))
@@ -98,12 +90,10 @@ func TestVersionApi_validVersionInWrongOrder(t *testing.T) {
 		BaseURL:    testServer.URL,
 	})
 
-	assert.Equal("2.0", version)
+	assert.Equal(t, "2.0", version)
 }
 
 func TestVersionApi_validVersion(t *testing.T) {
-	assert := testifyassert.New(t)
-
 	mux := http.NewServeMux()
 	mux.HandleFunc("/version/api", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("[\"1.0\",\"2.0\"]"))
@@ -117,5 +107,5 @@ func TestVersionApi_validVersion(t *testing.T) {
 		BaseURL:    testServer.URL,
 	})
 
-	assert.Equal("2.0", version)
+	assert.Equal(t, "2.0", version)
 }

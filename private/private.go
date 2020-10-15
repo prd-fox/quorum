@@ -124,7 +124,7 @@ func selectPrivateTxManager(client *engine.Client) (PrivateTransactionManager, e
 		// Constellation doesn't have /version endpoint
 		privateTxManager = constellation.New(client)
 	} else {
-		privateTxManager = tessera.New(client, []byte(tessera.RetrieveTesseraAPIVersion(client)))
+		privateTxManager = tessera.New(client)
 	}
 	return privateTxManager, nil
 }
