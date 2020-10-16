@@ -11,9 +11,8 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/private/engine/tessera"
-
 	"github.com/ethereum/go-ethereum/private/engine/constellation"
+	"github.com/ethereum/go-ethereum/private/engine/tessera/version1_0"
 )
 
 func TestFromEnvironmentOrNil_whenNoConfig(t *testing.T) {
@@ -68,7 +67,7 @@ func TestFromEnvironmentOrNil_whenUsingUnixSocketWithTessera(t *testing.T) {
 	os.Setenv("ARBITRARY_CONFIG_ENV", socketFile)
 	p := FromEnvironmentOrNil("ARBITRARY_CONFIG_ENV")
 
-	if !tessera.Is(p) {
+	if !version1_0.Is(p) {
 		t.Errorf("expected Tessera to be used but found %v", reflect.TypeOf(p))
 	}
 }

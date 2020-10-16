@@ -116,15 +116,16 @@ func selectPrivateTxManager(client *engine.Client) (PrivateTransactionManager, e
 	if err != nil {
 		return nil, err
 	}
+
 	var privateTxManager PrivateTransactionManager
 	defer func() {
-		log.Info("Target Private Tx Manager", "name", privateTxManager.Name(), "distributionVersion", version)
+		log.Info("Target Private Tx Manager", "name", privateTxManager.Name(), "version", version)
 	}()
 	if res.StatusCode != 200 {
 		// Constellation doesn't have /version endpoint
 		privateTxManager = constellation.New(client)
-	} else {
-		privateTxManager = tessera.New(client)
+		return privateTxManager, nil
 	}
-	return privateTxManager, nil
+	privateTxManager, err = tessera.New(client)
+	return privateTxManager, err
 }

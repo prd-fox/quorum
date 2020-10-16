@@ -3,7 +3,6 @@ package version2_0
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -35,10 +34,9 @@ var (
 	testServer *httptest.Server
 	testObject *tesseraPrivateTxManager
 
-	sendRequestCaptor                    = make(chan *capturedRequest)
-	receiveRequestCaptor                 = make(chan *capturedRequest)
-	sendSignedTxRequestCaptor            = make(chan *capturedRequest)
-	sendSignedTxOctetStreamRequestCaptor = make(chan *capturedRequest)
+	sendRequestCaptor         = make(chan *capturedRequest)
+	receiveRequestCaptor      = make(chan *capturedRequest)
+	sendSignedTxRequestCaptor = make(chan *capturedRequest)
 )
 
 type capturedRequest struct {
@@ -72,7 +70,7 @@ func setup() {
 	testObject = New(&engine.Client{
 		HttpClient: &http.Client{},
 		BaseURL:    testServer.URL,
-	}, []byte("2.0.0"))
+	})
 }
 
 func MockSendAPIHandlerFunc(response http.ResponseWriter, request *http.Request) {
@@ -131,20 +129,6 @@ func MockSendSignedTxAPIHandlerFunc(response http.ResponseWriter, request *http.
 	}
 }
 
-func MockSendSignedTxOctetStreamAPIHandlerFunc(response http.ResponseWriter, request *http.Request) {
-	actualRequest := new(sendSignedTxRequest)
-	reqHash, err := ioutil.ReadAll(request.Body)
-	if err != nil {
-		go func(o *capturedRequest) { sendSignedTxOctetStreamRequestCaptor <- o }(&capturedRequest{err: err})
-		return
-	}
-	actualRequest.Hash = reqHash
-	actualRequest.To = strings.Split(request.Header["C11n-To"][0], ",")
-
-	go func(o *capturedRequest) { sendSignedTxOctetStreamRequestCaptor <- o }(&capturedRequest{request: actualRequest, header: request.Header})
-	response.Write([]byte(common.BytesToEncryptedPayloadHash(reqHash).ToBase64()))
-}
-
 func teardown() {
 	testServer.Close()
 }
@@ -183,73 +167,6 @@ func TestSend_whenTypical(t *testing.T) {
 	assert.Equal(arbitraryExtra.ACHashes.ToBase64s(), actualRequest.AffectedContractTransactions, "request.affectedContractTransactions")
 	assert.Equal(arbitraryExtra.ACMerkleRoot.ToBase64(), actualRequest.ExecHash, "request.execHash")
 	assert.Equal(arbitraryHash, actualHash, "returned hash")
-}
-
-func TestSend_whenTesseraVersionDoesNotSupportPrivacyEnhancements(t *testing.T) {
-	assert := testifyassert.New(t)
-
-	testObjectNoPE := New(&engine.Client{
-		HttpClient: &http.Client{},
-		BaseURL:    testServer.URL,
-	}, []byte("0.10-SNAPSHOT"))
-
-	assert.False(testObjectNoPE.HasFeature(engine.PrivacyEnhancements), "the supplied version does not support privacy enhancements")
-
-	// trying to send a party protection transaction
-	_, err := testObjectNoPE.Send(arbitraryPrivatePayload, arbitraryFrom, arbitraryTo, arbitraryExtra)
-	if err != engine.ErrPrivateTxManagerDoesNotSupportPrivacyEnhancements {
-		t.Fatal("Expecting send to raise ErrPrivateTxManagerDoesNotSupportPrivacyEnhancements")
-	}
-}
-
-func TestSendRaw_whenTesseraVersionDoesNotSupportPrivacyEnhancements(t *testing.T) {
-	assert := testifyassert.New(t)
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("/send", MockSendAPIHandlerFunc)
-	mux.HandleFunc("/transaction/", MockReceiveAPIHandlerFunc)
-	mux.HandleFunc("/sendsignedtx", MockSendSignedTxOctetStreamAPIHandlerFunc)
-
-	testServerNoPE := httptest.NewServer(mux)
-	defer testServerNoPE.Close()
-
-	testObjectNoPE := New(&engine.Client{
-		HttpClient: &http.Client{},
-		BaseURL:    testServerNoPE.URL,
-	}, []byte("0.10-SNAPSHOT"))
-
-	assert.False(testObjectNoPE.HasFeature(engine.PrivacyEnhancements), "the supplied version does not support privacy enhancements")
-
-	// trying to send a party protection transaction
-	_, err := testObjectNoPE.SendSignedTx(arbitraryHash, arbitraryTo, arbitraryExtra)
-	if err != engine.ErrPrivateTxManagerDoesNotSupportPrivacyEnhancements {
-		t.Fatal("Expecting send to raise ErrPrivateTxManagerDoesNotSupportPrivacyEnhancements")
-	}
-
-	// send a standard private transaction and check that the old version of the /sendsignedtx is used (using octetstream content type)
-
-	// caching incomplete item
-	_, _, err = testObjectNoPE.ReceiveRaw(arbitraryHashNoPrivateMetadata)
-	if err != nil {
-		t.Fatalf("%s", err)
-	}
-	<-receiveRequestCaptor
-
-	// caching complete item
-	_, err = testObjectNoPE.SendSignedTx(arbitraryHashNoPrivateMetadata, arbitraryTo, &engine.ExtraMetadata{
-		PrivacyFlag: engine.PrivacyFlagStandardPrivate})
-	if err != nil {
-		t.Fatalf("%s", err)
-	}
-	req := <-sendSignedTxOctetStreamRequestCaptor
-	assert.Equal("application/octet-stream", req.header["Content-Type"][0])
-
-	_, actualExtra, err := testObjectNoPE.Receive(arbitraryHashNoPrivateMetadata)
-	if err != nil {
-		t.Fatalf("%s", err)
-	}
-	assert.Equal(engine.PrivacyFlagStandardPrivate, actualExtra.PrivacyFlag, "cached privacy flag")
-
 }
 
 func TestReceive_whenTypical(t *testing.T) {

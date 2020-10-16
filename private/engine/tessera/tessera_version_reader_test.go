@@ -39,7 +39,7 @@ func TestVersionApi_GarbageData(t *testing.T) {
 		BaseURL:    testServer.URL,
 	})
 
-	assert.Equal(t, apiVersion1, version)
+	assert.Equal(t, unknownApiVersion, version)
 }
 
 func TestVersionApi_emptyVersionsArray(t *testing.T) {
@@ -62,7 +62,7 @@ func TestVersionApi_emptyVersionsArray(t *testing.T) {
 func TestVersionApi_invalidVersionItem(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/version/api", func(writer http.ResponseWriter, request *http.Request) {
-		writer.Write([]byte("{\"versions\":[{\"version\":\"1.0\"},{}]}"))
+		writer.Write([]byte(`["1.0", ""]`))
 	})
 
 	testServer = httptest.NewServer(mux)

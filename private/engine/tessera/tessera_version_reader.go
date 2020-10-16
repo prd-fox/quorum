@@ -8,23 +8,27 @@ import (
 	"github.com/ethereum/go-ethereum/private/engine"
 )
 
+//a version cannot go lower than this, and it is not a known API version, so any
+//API version we retrieve will be considered "higher" than this one and replaced
+const unknownApiVersion = "0.0"
 const apiVersion1 = "1.0"
+const apiVersion2 = "2.0"
 
 var knownApiVersions = map[string]bool{
-	"1.0": true,
-	"2.0": true,
+	apiVersion1: true,
+	apiVersion2: true,
 }
 
 func APIVersions(client *engine.Client) []string {
 	res, err := client.Get("/version/api")
 	if err != nil {
 		log.Error("Error invoking the tessera /version/api API: %v.", err)
-		return []string{}
+		return []string{apiVersion1}
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
 		log.Error("Invalid status code returned by the tessera /version/api API: %d.", res.StatusCode)
-		return []string{}
+		return []string{apiVersion1}
 	}
 	var versions []string
 	if err := json.NewDecoder(res.Body).Decode(&versions); err != nil {
@@ -33,7 +37,7 @@ func APIVersions(client *engine.Client) []string {
 	}
 	if len(versions) == 0 {
 		log.Error("Expecting at least one API version to be returned by the tessera /version/api API.")
-		return []string{}
+		return []string{apiVersion1}
 	}
 	return versions
 }
@@ -44,7 +48,7 @@ func RetrieveTesseraAPIVersion(client *engine.Client) string {
 	onlyKnownVersions := filterUnknownVersions(allRetrievedVersions)
 
 	// pick the latest version from the versions array
-	latestVersion := apiVersion1
+	latestVersion := unknownApiVersion
 	latestParsedVersion, _ := parseVersion([]byte(latestVersion))
 	for _, ver := range onlyKnownVersions {
 		if len(ver) == 0 {

@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/private/cache"
 	"github.com/ethereum/go-ethereum/private/engine"
@@ -20,20 +19,19 @@ import (
 )
 
 type tesseraPrivateTxManager struct {
-	features *engine.FeatureSet
-	client   *engine.Client
-	cache    *gocache.Cache
+	client *engine.Client
+	cache  *gocache.Cache
 }
 
-func New(client *engine.Client, version []byte) *tesseraPrivateTxManager {
-	ptmVersion, err := parseVersion(version)
-	if err != nil {
-		log.Error("Error parsing version components from the tessera version: %s. Unable to extract transaction manager features.", version)
-	}
+func Is(ptm interface{}) bool {
+	_, ok := ptm.(*tesseraPrivateTxManager)
+	return ok
+}
+
+func New(client *engine.Client) *tesseraPrivateTxManager {
 	return &tesseraPrivateTxManager{
-		features: engine.NewFeatureSet(tesseraVersionFeatures(ptmVersion)...),
-		client:   client,
-		cache:    gocache.New(cache.DefaultExpiration, cache.CleanupInterval),
+		client: client,
+		cache:  gocache.New(cache.DefaultExpiration, cache.CleanupInterval),
 	}
 }
 
@@ -58,9 +56,6 @@ func (t *tesseraPrivateTxManager) submitJSON(method, path string, request interf
 }
 
 func (t *tesseraPrivateTxManager) Send(data []byte, from string, to []string, extra *engine.ExtraMetadata) (common.EncryptedPayloadHash, error) {
-	if extra.PrivacyFlag.IsNotStandardPrivate() && !t.features.HasFeature(engine.PrivacyEnhancements) {
-		return common.EncryptedPayloadHash{}, engine.ErrPrivateTxManagerDoesNotSupportPrivacyEnhancements
-	}
 	response := new(sendResponse)
 	acMerkleRoot := ""
 	if !common.EmptyHash(extra.ACMerkleRoot) {
@@ -114,7 +109,6 @@ func (t *tesseraPrivateTxManager) EncryptPayload(data []byte, from string, to []
 }
 
 func (t *tesseraPrivateTxManager) StoreRaw(data []byte, from string) (common.EncryptedPayloadHash, error) {
-
 	response := new(sendResponse)
 
 	if _, err := t.submitJSON("POST", "/storeraw", &storerawRequest{
@@ -140,59 +134,22 @@ func (t *tesseraPrivateTxManager) StoreRaw(data []byte, from string) (common.Enc
 	return eph, nil
 }
 
-// allow new quorum to send raw transactions when connected to an old tessera
-func (c *tesseraPrivateTxManager) sendSignedPayloadOctetStream(signedPayload []byte, b64To []string) ([]byte, error) {
-	buf := bytes.NewBuffer(signedPayload)
-	req, err := http.NewRequest("POST", c.client.FullPath("/sendsignedtx"), buf)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("c11n-to", strings.Join(b64To, ","))
-	req.Header.Set("Content-Type", "application/octet-stream")
-	res, err := c.client.HttpClient.Do(req)
-
-	if res != nil {
-		defer res.Body.Close()
-	}
-	if err != nil {
-		return nil, err
-	}
-	if res.StatusCode != 200 {
-		return nil, fmt.Errorf("Non-200 status code: %+v", res)
-	}
-
-	return ioutil.ReadAll(res.Body)
-}
-
 // also populate cache item with additional extra metadata
 func (t *tesseraPrivateTxManager) SendSignedTx(data common.EncryptedPayloadHash, to []string, extra *engine.ExtraMetadata) ([]byte, error) {
-	if extra.PrivacyFlag.IsNotStandardPrivate() && !t.features.HasFeature(engine.PrivacyEnhancements) {
-		return nil, engine.ErrPrivateTxManagerDoesNotSupportPrivacyEnhancements
-	}
 	response := new(sendSignedTxResponse)
 	acMerkleRoot := ""
 	if !common.EmptyHash(extra.ACMerkleRoot) {
 		acMerkleRoot = extra.ACMerkleRoot.ToBase64()
 	}
 	// The /sendsignedtx has been updated as part of privacy enhancements to support a json payload.
-	// If an older tessera is used - invoke the octetstream version of the /sendsignedtx
-	if t.features.HasFeature(engine.PrivacyEnhancements) {
-		if _, err := t.submitJSON("POST", "/sendsignedtx", &sendSignedTxRequest{
-			Hash:                         data.Bytes(),
-			To:                           to,
-			AffectedContractTransactions: extra.ACHashes.ToBase64s(),
-			ExecHash:                     acMerkleRoot,
-			PrivacyFlag:                  extra.PrivacyFlag,
-		}, response); err != nil {
-			return nil, err
-		}
-	} else {
-		returnedHash, err := t.sendSignedPayloadOctetStream(data.Bytes(), to)
-		if err != nil {
-			return nil, err
-		}
-		response.Key = string(returnedHash)
+	if _, err := t.submitJSON("POST", "/sendsignedtx", &sendSignedTxRequest{
+		Hash:                         data.Bytes(),
+		To:                           to,
+		AffectedContractTransactions: extra.ACHashes.ToBase64s(),
+		ExecHash:                     acMerkleRoot,
+		PrivacyFlag:                  extra.PrivacyFlag,
+	}, response); err != nil {
+		return nil, err
 	}
 
 	hashBytes, err := base64.StdEncoding.DecodeString(response.Key)
@@ -367,11 +324,11 @@ func (t *tesseraPrivateTxManager) GetParticipants(txHash common.EncryptedPayload
 }
 
 func (t *tesseraPrivateTxManager) Name() string {
-	return "Tessera"
+	return "Tessera - API v2.0"
 }
 
 func (t *tesseraPrivateTxManager) HasFeature(f engine.PrivateTransactionManagerFeature) bool {
-	return t.features.HasFeature(f)
+	return f == engine.PrivacyEnhancements
 }
 
 // don't serialize body if nil

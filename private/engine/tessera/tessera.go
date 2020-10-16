@@ -1,8 +1,10 @@
 package tessera
 
 import (
+	"errors"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/private/engine"
+	"github.com/ethereum/go-ethereum/private/engine/tessera/version1_0"
 	"github.com/ethereum/go-ethereum/private/engine/tessera/version2_0"
 )
 
@@ -28,15 +30,15 @@ type PrivateTransactionManager interface {
 	DecryptPayload(payload common.DecryptRequest) ([]byte, *engine.ExtraMetadata, error)
 }
 
-func New(client *engine.Client) PrivateTransactionManager {
+func New(client *engine.Client) (PrivateTransactionManager, error) {
 	highestKnownVersion := RetrieveTesseraAPIVersion(client)
 
 	switch highestKnownVersion {
-	case "1.0":
-		return version2_0.New(client, []byte(highestKnownVersion))
-	case "2.0":
-		return version2_0.New(client, []byte(highestKnownVersion))
+	case apiVersion1:
+		return version1_0.New(client), nil
+	case apiVersion2:
+		return version2_0.New(client), nil
 	default:
-		panic("no known versions of tessera!")
+		return nil, errors.New("no known version of tessera")
 	}
 }
