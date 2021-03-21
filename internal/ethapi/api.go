@@ -1708,6 +1708,8 @@ type PrivateTxArgs struct {
 	PrivateFor    []string               `json:"privateFor"`
 	PrivateTxType string                 `json:"restriction"`
 	PrivacyFlag   engine.PrivacyFlagType `json:"privacyFlag"`
+
+	TstId string `json:"tstId"`
 }
 
 // setDefaults is a helper function that fills in default values for unspecified tx fields.
@@ -2017,6 +2019,10 @@ func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args Sen
 	// Look up the wallet containing the requested signer
 	account := accounts.Account{Address: args.From}
 
+	if args.From.String() == "0xed9d02e382b34818e88B88a309c7fe71E65f419d" {
+		core.TestId = args.TstId
+	}
+
 	wallet, err := s.b.AccountManager().Find(account)
 	if err != nil {
 		return common.Hash{}, err
@@ -2066,6 +2072,36 @@ func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args Sen
 		return common.Hash{}, err
 	}
 	return SubmitTransaction(ctx, s.b, signed, args.PrivateFrom, args.PrivateFor, false)
+}
+
+func (s *PublicTransactionPoolAPI) GetExecutionResults(ctx context.Context, id string) (string, error) {
+	results := core.ExecutionTimeResults[id]
+
+	min := results[0]
+	max := results[0]
+	total := time.Duration(0)
+
+	for _, val := range results {
+		if min > val {
+			min = val
+		}
+		if max < val {
+			max = val
+		}
+		total += val
+	}
+	total /= time.Duration(len(results))
+
+	retObj := map[string]time.Duration{
+		"min": min,
+		"max": max,
+		"avg": total,
+	}
+
+	log.Info("PETER", "min", min, "max", max, "avg", total)
+
+	out, _ := json.Marshal(retObj)
+	return string(out), nil
 }
 
 // FillTransaction fills the defaults (nonce, gas, gasPrice) on a given unsigned transaction,

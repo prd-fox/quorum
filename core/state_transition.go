@@ -21,6 +21,7 @@ import (
 	"math"
 	"math/big"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -31,6 +32,10 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/private"
 )
+
+var TestId = "tst"
+
+var ExecutionTimeResults = make(map[string][]time.Duration)
 
 /*
 The State Transitioning Model
@@ -350,7 +355,15 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 			}, nil
 		}
 
+		timeStart := time.Now()
 		ret, leftoverGas, vmerr = evm.Call(sender, to, data, st.gas, st.value)
+		if msg.From().String() == "0xed9d02e382b34818e88B88a309c7fe71E65f419d" {
+			timeExecution := time.Since(timeStart)
+			if _, ok := ExecutionTimeResults[TestId]; !ok {
+				ExecutionTimeResults[TestId] = make([]time.Duration, 0)
+			}
+			ExecutionTimeResults[TestId] = append(ExecutionTimeResults[TestId], timeExecution)
+		}
 	}
 	if vmerr != nil {
 		log.Info("VM returned with error", "err", vmerr)
